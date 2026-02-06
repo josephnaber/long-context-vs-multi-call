@@ -1,0 +1,1237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Long-Context LLMs vs. RAG: Cost, Speed &amp; Accuracy Research</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface2: #232733;
+            --border: #2e3345;
+            --text: #e1e4ed;
+            --text-muted: #8b90a0;
+            --accent: #6c8aff;
+            --accent2: #4ecdc4;
+            --cost: #f5a623;
+            --speed: #e74c8b;
+            --accuracy: #4ecdc4;
+            --green: #4ade80;
+            --red: #f87171;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 24px;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 48px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 700px;
+            margin: 0 auto;
+        }
+
+        .scenarios {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 48px;
+        }
+
+        .scenario {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .scenario h3 {
+            font-size: 1rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+
+        .scenario.lc h3 {
+            color: var(--accent);
+        }
+
+        .scenario.rag h3 {
+            color: var(--accent2);
+        }
+
+        .scenario p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .verdict-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 48px;
+        }
+
+        .verdict-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+        }
+
+        .verdict-card .label {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 8px;
+        }
+
+        .verdict-card.cost .label {
+            color: var(--cost);
+        }
+
+        .verdict-card.speed .label {
+            color: var(--speed);
+        }
+
+        .verdict-card.accuracy .label {
+            color: var(--accuracy);
+        }
+
+        .verdict-card .winner {
+            font-size: 1.3rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .verdict-card .detail {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        section {
+            margin-bottom: 48px;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        h2.cost {
+            border-color: var(--cost);
+        }
+
+        h2.speed {
+            border-color: var(--speed);
+        }
+
+        h2.accuracy {
+            border-color: var(--accuracy);
+        }
+
+        h2.hybrid {
+            border-color: var(--accent);
+        }
+
+        h2.papers {
+            border-color: var(--accent2);
+        }
+
+        .finding {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 20px 24px;
+            margin-bottom: 16px;
+        }
+
+        .finding h4 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .finding p {
+            color: var(--text-muted);
+            font-size: 0.93rem;
+            margin-bottom: 10px;
+        }
+
+        .finding .stat {
+            display: inline-block;
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-right: 8px;
+            margin-bottom: 6px;
+        }
+
+        .finding .stat.green {
+            color: var(--green);
+        }
+
+        .finding .stat.red {
+            color: var(--red);
+        }
+
+        .finding .stat.yellow {
+            color: var(--cost);
+        }
+
+        .source-link {
+            display: inline-block;
+            margin-top: 8px;
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .source-link:hover {
+            text-decoration: underline;
+        }
+
+        .source-tag {
+            display: inline-block;
+            background: var(--surface2);
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 0.9rem;
+        }
+
+        th,
+        td {
+            text-align: left;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: var(--surface2);
+            font-weight: 600;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        td {
+            background: var(--surface);
+        }
+
+        .tag-lc {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .tag-rag {
+            color: var(--accent2);
+            font-weight: 600;
+        }
+
+        .ref-list {
+            list-style: none;
+            counter-reset: ref;
+        }
+
+        .ref-list li {
+            counter-increment: ref;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 12px;
+        }
+
+        .ref-list li::before {
+            content: counter(ref) ".";
+            font-weight: 700;
+            color: var(--accent);
+            margin-right: 8px;
+        }
+
+        .ref-list li strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .ref-list li a {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 0.85rem;
+            word-break: break-all;
+        }
+
+        .ref-list li a:hover {
+            text-decoration: underline;
+        }
+
+        .ref-list li .desc {
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            margin-top: 4px;
+        }
+
+        .callout {
+            background: var(--surface2);
+            border-left: 4px solid var(--accent);
+            border-radius: 0 8px 8px 0;
+            padding: 16px 20px;
+            margin: 20px 0;
+            font-size: 0.93rem;
+        }
+
+        .callout.hybrid {
+            border-color: var(--accent2);
+        }
+
+        footer {
+            text-align: center;
+            padding-top: 32px;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.82rem;
+        }
+
+        @media (max-width: 700px) {
+
+            .scenarios,
+            .verdict-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 1.6rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <header>
+            <h1>Long-Context LLMs vs. RAG</h1>
+            <p>Research index comparing two approaches: (1) passing a full ~100-page document to an LLM in a single
+                prompt with multiple instructions, versus (2) using RAG to retrieve specific paragraphs and making 6
+                focused LLM calls. Evaluated on <strong>cost</strong>, <strong>speed</strong>, and
+                <strong>accuracy</strong>.
+            </p>
+        </header>
+
+        <!-- ===== SCENARIO DEFINITIONS ===== -->
+        <div class="scenarios">
+            <div class="scenario lc">
+                <h3>Scenario A &mdash; Long Context</h3>
+                <p>Pass the entire ~100-page document (~50&ndash;130K tokens) to the LLM in one call with a single
+                    multi-instruction prompt. Relies on the model's ability to attend over the full context window.</p>
+            </div>
+            <div class="scenario rag">
+                <h3>Scenario B &mdash; RAG + 6 Calls</h3>
+                <p>Use embeddings &amp; retrieval to find the most relevant paragraphs, then make 6 separate LLM
+                    calls&mdash;each with a single instruction and only the retrieved context (~500&ndash;2K tokens per
+                    call).</p>
+            </div>
+        </div>
+
+        <!-- ===== QUICK VERDICT ===== -->
+        <div class="verdict-grid">
+            <div class="verdict-card cost">
+                <div class="label">Cost</div>
+                <div class="winner" style="color: var(--accent2);">RAG wins</div>
+                <div class="detail">Up to 60&ndash;90% fewer input tokens billed. Long context can cost $5&ndash;20+ per
+                    100-page call.</div>
+            </div>
+            <div class="verdict-card speed">
+                <div class="label">Speed</div>
+                <div class="winner" style="color: var(--accent2);">RAG wins</div>
+                <div class="detail">~1s avg per RAG query vs. 30&ndash;60s for long-context calls at 100K+ tokens.</div>
+            </div>
+            <div class="verdict-card accuracy">
+                <div class="label">Accuracy</div>
+                <div class="winner" style="color: var(--accent2);">It Depends</div>
+                <div class="detail">LC wins for single tasks (+4&ndash;13%), but with 6 distinct instructions, "Curse of
+                    Instructions" causes exponential accuracy decay. Pipeline isolates each task.</div>
+            </div>
+        </div>
+
+        <!-- ===== YOUR PIPELINE SECTION ===== -->
+        <section>
+            <h2 style="border-color: #a78bfa;">Healthcare Compliance Pipeline: Why 6 Calls Wins</h2>
+
+            <div class="callout" style="border-color: #a78bfa; margin-bottom: 24px;">
+                <strong>Critical insight:</strong> The research showing long-context outperforms RAG by 4&ndash;13%
+                tested a <em>single identical task</em> on both approaches (e.g., "answer this question"). This pipeline
+                has <strong>6 fundamentally different tasks</strong> in sequence. This changes everything &mdash;
+                multi-instruction accuracy degrades exponentially, and the tasks have dependencies that a single call
+                cannot handle.
+            </div>
+
+            <h3 style="margin: 20px 0 12px; color: #a78bfa;">The 6 Pipeline Tasks</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Task</th>
+                        <th>What It Needs</th>
+                        <th>Why It Needs Its Own Call</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>1</td>
+                        <td><strong>Compliance comparison</strong> &mdash; proposal vs. state/federal guidance</td>
+                        <td>Proposal + legal docs</td>
+                        <td>Core analysis; other tasks depend on this output</td>
+                    </tr>
+                    <tr>
+                        <td>2</td>
+                        <td><strong>Section analysis</strong> &mdash; header, footer, disclaimer, CTA</td>
+                        <td>Specific sections + rules</td>
+                        <td>RAG retrieves only the rules relevant to each section type</td>
+                    </tr>
+                    <tr>
+                        <td>3</td>
+                        <td><strong>Historical analysis</strong> &mdash; past proposals accepted/rejected</td>
+                        <td>Past decision data</td>
+                        <td>Entirely different context (historical DB, not current legal docs)</td>
+                    </tr>
+                    <tr>
+                        <td>4</td>
+                        <td><strong>Citation verification</strong> &mdash; check Task 1's legal references</td>
+                        <td>Task 1 output + legal docs</td>
+                        <td><em>Depends on Task 1 output</em>; impossible in a single call</td>
+                    </tr>
+                    <tr>
+                        <td>5</td>
+                        <td><strong>Issue ranking &amp; tagging</strong> &mdash; severity, recommendations</td>
+                        <td>Tasks 1&ndash;4 outputs</td>
+                        <td><em>Depends on all prior outputs</em>; synthesis step</td>
+                    </tr>
+                    <tr>
+                        <td>6</td>
+                        <td><strong>Output validation</strong> &mdash; format, bias, blacklisted terms</td>
+                        <td>Task 5 output</td>
+                        <td><em>Quality gate</em>; separate LLM acts as reviewer/checker</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3 style="margin: 24px 0 12px; color: #f87171;">The "Curse of Instructions" Problem</h3>
+
+            <div class="finding">
+                <h4>Multi-instruction success decays exponentially</h4>
+                <p>Research shows that overall success follows: <strong>P(all correct) =
+                        P(single)&hairsp;<sup>n</sup></strong>. Even if each instruction has a 90% success rate
+                    individually, 6 instructions together yield only <strong>53% overall success</strong>. At 85%
+                    per-instruction, that drops to <strong>38%</strong>. This means a single mega-prompt with 6
+                    different
+                    compliance tasks will frequently drop or conflate at least one task.</p>
+                <span class="stat red">90% per-task &rarr; 53% all-correct (6 tasks)</span>
+                <span class="stat red">85% per-task &rarr; 38% all-correct (6 tasks)</span>
+                <br>
+                <a class="source-link" href="https://openreview.net/forum?id=R6q67CDBCH" target="_blank">openreview.net
+                    &mdash; Curse of Instructions: LLMs Cannot Follow Multiple Instructions at Once</a>
+                <span class="source-tag">OpenReview 2025</span>
+                <br>
+                <a class="source-link" href="https://arxiv.org/html/2507.11538v1" target="_blank">arxiv.org &mdash; How
+                    Many Instructions Can LLMs Follow at Once?</a>
+                <span class="source-tag">Jaroslawicz et al., 2025</span>
+            </div>
+
+            <div class="finding">
+                <h4>Multi-task prompt degradation is well-documented across model families</h4>
+                <p>A systematic study across six NLP tasks and multiple LLM families found significant degradation when
+                    combining tasks in a single prompt. Performance is architecture-dependent: some models collapse
+                    entirely on fine-grained tasks when other instructions compete for attention. GPT-4o achieved only
+                    15% all-instructions-followed rate with 10 instructions; Claude 3.5 Sonnet reached 44%.</p>
+                <span class="stat red">GPT-4o: 15% success at 10 instructions</span>
+                <span class="stat red">Claude 3.5: 44% success at 10 instructions</span>
+                <br>
+                <a class="source-link" href="https://www.mdpi.com/2079-9292/14/21/4349" target="_blank">mdpi.com &mdash;
+                    Degradation of Multi-Task Prompting Across Six NLP Tasks and LLM Families</a>
+                <span class="source-tag">Electronics, 2025</span>
+                <br>
+                <a class="source-link" href="https://www.mdpi.com/2079-9292/13/23/4712" target="_blank">mdpi.com &mdash;
+                    Single-Task vs. Multitask Prompts: Comparative Analysis</a>
+                <span class="source-tag">Electronics, 2024</span>
+            </div>
+
+            <div class="finding">
+                <h4>Prompt chaining outperforms monolithic multi-step prompts</h4>
+                <p>ACL 2024 research demonstrated that chained refinement (separate sequential calls) outperforms
+                    stepwise refinement in a single prompt for summarization and complex reasoning tasks. Chaining
+                    reduces hallucination, makes debugging easier (engineers can pinpoint which step failed), and each
+                    call
+                    gets the full attention budget of the model focused on one task.</p>
+                <a class="source-link"
+                    href="https://www.getmaxim.ai/articles/prompt-chaining-for-ai-engineers-a-practical-guide-to-improving-llm-output-quality/"
+                    target="_blank">getmaxim.ai &mdash; Prompt Chaining: Improving LLM Output Quality</a>
+                <span class="source-tag">Maxim AI</span>
+                <br>
+                <a class="source-link" href="https://orq.ai/blog/prompt-structure-chaining" target="_blank">orq.ai
+                    &mdash; Prompt Structure Chaining for LLMs</a>
+                <span class="source-tag">Orq.ai</span>
+            </div>
+
+            <h3 style="margin: 24px 0 12px; color: #4ade80;">Why the Pipeline Architecture is Correct</h3>
+
+            <div class="finding">
+                <h4>Task dependencies make single-call impossible</h4>
+                <p>Tasks 4, 5, and 6 explicitly depend on the <em>output</em> of earlier tasks. Task 4 verifies
+                    Task 1's citations. Task 5 synthesizes Tasks 1&ndash;4. Task 6 validates Task 5's output. In a
+                    single LLM call, the model generates sequentially and <strong>cannot go back to verify or correct
+                        its own earlier output</strong>. A pipeline lets each step inspect and validate the prior step's
+                    work &mdash; this is the "LLM-as-checker" pattern that research shows dramatically improves
+                    reliability.</p>
+            </div>
+
+            <div class="finding">
+                <h4>Different tasks need different context</h4>
+                <p>Task 1 needs legal guidance documents. Task 3 needs historical proposal data (an entirely different
+                    corpus). Task 6 needs a list of blacklisted terms and format schemas. Stuffing all of this into one
+                    context window wastes tokens on irrelevant context and triggers the "lost in the middle" problem.
+                    RAG retrieves only what each task actually needs.</p>
+            </div>
+
+            <div class="finding">
+                <h4>Healthcare compliance demands auditability</h4>
+                <p>In regulated healthcare environments, teams need to trace <em>which</em> rule flagged <em>which</em>
+                    issue. A single monolithic output is a black box. A pipeline produces 6 separate, auditable outputs
+                    with clear provenance &mdash; critical for regulatory review and for building trust with compliance
+                    teams.</p>
+                <a class="source-link" href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12407621/" target="_blank">PMC
+                    &mdash; AI Agents in Clinical Medicine: A Systematic Review</a>
+                <span class="source-tag">PMC/NIH 2025</span>
+                <br>
+                <a class="source-link" href="https://aclanthology.org/2024.bionlp-1.4.pdf"
+                    target="_blank">aclanthology.org &mdash; Multi-Agent System for Medical Necessity Justification</a>
+                <span class="source-tag">BioNLP 2024</span>
+            </div>
+
+            <h3 style="margin: 24px 0 12px; color: var(--accent2);">Recommended Architecture</h3>
+
+            <div class="callout hybrid">
+                <strong>Optimal approach for this use case:</strong> Use RAG to retrieve relevant legal sections per
+                task, then run a <strong>6-step pipeline</strong> where each call has a single focused instruction and
+                only the context it needs. Tasks 1 &amp; 2 can run in parallel (both compare against legal docs). Task 3
+                runs in parallel against a different data source. Tasks 4 &rarr; 5 &rarr; 6 run sequentially since each
+                depends on prior output. Total wall-clock time: ~4&ndash;6 seconds (vs. 30&ndash;60s for a single
+                long-context call that would be less accurate).
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dimension</th>
+                        <th>Single Long-Context Call (6 instructions)</th>
+                        <th>6-Step Pipeline (1 instruction each)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>All-tasks accuracy</strong></td>
+                        <td class="tag-lc">~38&ndash;53% (exponential decay)</td>
+                        <td class="tag-rag">~85&ndash;90% per task (isolated)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Can handle task dependencies</strong></td>
+                        <td class="tag-lc">No &mdash; generates linearly, can't self-verify</td>
+                        <td class="tag-rag">Yes &mdash; each step inspects prior output</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Auditability</strong></td>
+                        <td class="tag-lc">Single black-box output</td>
+                        <td class="tag-rag">6 traceable, logged outputs</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Error isolation</strong></td>
+                        <td class="tag-lc">One failure ruins entire output</td>
+                        <td class="tag-rag">Failure in one step is contained</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Context relevance</strong></td>
+                        <td class="tag-lc">All docs crammed in; "lost in the middle"</td>
+                        <td class="tag-rag">Each call gets only relevant context</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Parallelism</strong></td>
+                        <td class="tag-lc">None (1 serial call)</td>
+                        <td class="tag-rag">Tasks 1, 2, 3 in parallel; 4&rarr;5&rarr;6 serial</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ===== COST SECTION ===== -->
+        <section>
+            <h2 class="cost">Cost Comparison</h2>
+
+            <div class="finding">
+                <h4>Token economics strongly favor RAG</h4>
+                <p>RAG sends only retrieved chunks to the LLM (e.g., 6 calls &times; ~2K tokens = ~12K total input
+                    tokens), while long context sends the full document (~50&ndash;130K tokens). At typical API pricing,
+                    the long-context call is <strong>5&ndash;10&times; more expensive</strong> in raw input token cost
+                    alone.</p>
+                <span class="stat yellow">100-page doc &asymp; 50&ndash;130K tokens</span>
+                <span class="stat green">6 RAG calls &asymp; 12K total tokens</span>
+                <br>
+                <a class="source-link" href="https://www.meilisearch.com/blog/rag-vs-long-context-llms"
+                    target="_blank">meilisearch.com/blog/rag-vs-long-context-llms</a>
+                <span class="source-tag">Meilisearch 2025</span>
+            </div>
+
+            <div class="finding">
+                <h4>Self-Route hybrid cuts cost by 39&ndash;65% vs. pure long-context</h4>
+                <p>The Self-Route method (EMNLP 2024) routes easy queries to RAG and hard queries to long-context.
+                    GPT-4o used only 61% of tokens compared to full LC; Gemini-1.5-Pro used only 38.6% of
+                    tokens&mdash;with negligible accuracy loss (-0.2% for GPT-4o, -2.2% for Gemini).</p>
+                <span class="stat green">65% cost reduction (Gemini)</span>
+                <span class="stat green">39% cost reduction (GPT-4o)</span>
+                <br>
+                <a class="source-link" href="https://arxiv.org/abs/2407.16833"
+                    target="_blank">arxiv.org/abs/2407.16833</a>
+                <span class="source-tag">Li et al., EMNLP 2024</span>
+                <br>
+                <a class="source-link" href="https://aclanthology.org/2024.emnlp-industry.66/"
+                    target="_blank">aclanthology.org/2024.emnlp-industry.66</a>
+                <span class="source-tag">ACL Anthology</span>
+            </div>
+
+            <div class="finding">
+                <h4>Prompt caching can narrow the gap&mdash;but not close it</h4>
+                <p>Anthropic's prefix caching offers 90% cost reduction on cached input tokens ($0.30/M vs $3.00/M).
+                    OpenAI gives 50% off cached tokens automatically. This helps when making repeated calls against
+                    the same document, but RAG's base token count is still much smaller.</p>
+                <span class="stat green">90% cache savings (Anthropic)</span>
+                <span class="stat green">50% cache savings (OpenAI)</span>
+                <br>
+                <a class="source-link" href="https://www.anthropic.com/news/prompt-caching"
+                    target="_blank">anthropic.com/news/prompt-caching</a>
+                <span class="source-tag">Anthropic</span>
+                <br>
+                <a class="source-link" href="https://ngrok.com/blog/prompt-caching/"
+                    target="_blank">ngrok.com/blog/prompt-caching</a>
+                <span class="source-tag">ngrok 2025</span>
+                <br>
+                <a class="source-link"
+                    href="https://mcginniscommawill.com/posts/2025-11-17-llm-prompt-caching-comparison/"
+                    target="_blank">mcginniscommawill.com &mdash; LLM prompt caching comparison</a>
+                <span class="source-tag">McGinnis 2025</span>
+            </div>
+
+            <div class="finding">
+                <h4>RAG has infrastructure overhead</h4>
+                <p>RAG is not free: costs include embedding generation, vector database hosting, and retrieval pipeline
+                    maintenance. However, for a single 100-page document use case, this overhead is minimal (a single
+                    embedding pass costs pennies). The total cost of ownership favors RAG at scale.</p>
+                <a class="source-link" href="https://www.elastic.co/search-labs/blog/rag-vs-long-context-model-llm"
+                    target="_blank">elastic.co/search-labs/blog/rag-vs-long-context-model-llm</a>
+                <span class="source-tag">Elasticsearch Labs</span>
+            </div>
+        </section>
+
+        <!-- ===== SPEED SECTION ===== -->
+        <section>
+            <h2 class="speed">Speed &amp; Latency Comparison</h2>
+
+            <div class="finding">
+                <h4>RAG is ~30&ndash;45&times; faster per query</h4>
+                <p>Benchmarks show RAG average query speed of approximately <strong>1 second</strong>, while
+                    long-context calls average <strong>30&ndash;60 seconds</strong> when context approaches hundreds of
+                    thousands of tokens. The prefill stage (processing all input tokens before generating output)
+                    dominates latency for long-context calls.</p>
+                <span class="stat green">RAG: ~1s avg</span>
+                <span class="stat red">LC: ~30&ndash;60s avg</span>
+                <br>
+                <a class="source-link" href="https://byteiota.com/rag-vs-long-context-2026-retrieval-debate/"
+                    target="_blank">byteiota.com/rag-vs-long-context-2026-retrieval-debate</a>
+                <span class="source-tag">ByteIota 2026</span>
+                <br>
+                <a class="source-link" href="https://www.meilisearch.com/blog/rag-vs-long-context-llms"
+                    target="_blank">meilisearch.com/blog/rag-vs-long-context-llms</a>
+                <span class="source-tag">Meilisearch</span>
+            </div>
+
+            <div class="finding">
+                <h4>Long input increases output generation latency too</h4>
+                <p>An underappreciated fact: using more input tokens generally leads to slower <em>output</em> token
+                    generation as well, not just slower prefill. The KV-cache grows with context length, slowing down
+                    every subsequent token generated.</p>
+                <a class="source-link"
+                    href="https://runloop.ai/blog/latency-vs-tokenization-the-fundamental-trade-off-shaping-llm-research"
+                    target="_blank">runloop.ai/blog &mdash; Latency vs Tokenization trade-off</a>
+                <span class="source-tag">Runloop AI</span>
+                <br>
+                <a class="source-link" href="https://docs.anyscale.com/llm/serving/benchmarking/metrics"
+                    target="_blank">docs.anyscale.com &mdash; LLM latency &amp; throughput metrics</a>
+                <span class="source-tag">Anyscale</span>
+            </div>
+
+            <div class="finding">
+                <h4>6 parallel RAG calls can be faster than 1 long-context call</h4>
+                <p>If the 6 RAG calls are independent, they can run in parallel.
+                    Six ~1-second calls running concurrently complete in ~1&ndash;2 seconds total, versus 30&ndash;60
+                    seconds for a single long-context call. Even sequentially, 6 &times; 1s = 6 seconds is far faster.
+                </p>
+                <a class="source-link"
+                    href="https://www.tribe.ai/applied-ai/reducing-latency-and-cost-at-scale-llm-performance"
+                    target="_blank">tribe.ai &mdash; Reducing latency and cost at scale</a>
+                <span class="source-tag">Tribe AI</span>
+            </div>
+
+            <div class="finding">
+                <h4>Prompt caching reduces latency for repeated long-context calls</h4>
+                <p>When repeatedly querying the same document, Anthropic's prefix caching delivers an 85% reduction in
+                    time-to-first-token latency. This makes long-context viable for repeated-query scenarios but doesn't
+                    help for single-shot use.</p>
+                <a class="source-link"
+                    href="https://introl.com/blog/prompt-caching-infrastructure-llm-cost-latency-reduction-guide-2025"
+                    target="_blank">introl.com &mdash; Prompt caching infrastructure guide 2025</a>
+                <span class="source-tag">Introl 2025</span>
+            </div>
+        </section>
+
+        <!-- ===== ACCURACY SECTION ===== -->
+        <section>
+            <h2 class="accuracy">Accuracy &amp; Quality Comparison</h2>
+
+            <div class="finding">
+                <h4>On average, long-context outperforms RAG&mdash;but with caveats</h4>
+                <p>The EMNLP 2024 comprehensive study found that LC surpassed RAG by <strong>7.6%</strong> for
+                    Gemini-1.5-Pro, <strong>13.1%</strong> for GPT-4o, and <strong>3.6%</strong> for GPT-3.5-Turbo on
+                    average. However, for over 60% of queries, RAG and LC produce identical answers&mdash;meaning RAG
+                    only loses on the harder cases.</p>
+                <span class="stat green">LC +7.6% (Gemini)</span>
+                <span class="stat green">LC +13.1% (GPT-4o)</span>
+                <br>
+                <a class="source-link" href="https://arxiv.org/abs/2407.16833"
+                    target="_blank">arxiv.org/abs/2407.16833</a>
+                <span class="source-tag">Li et al., EMNLP 2024</span>
+            </div>
+
+            <div class="finding">
+                <h4>"Lost in the Middle" &mdash; long context has a blind spot</h4>
+                <p>The landmark Stanford study found that LLMs perform best when relevant information is at the
+                    <strong>beginning or end</strong> of the context, with performance degrading <strong>30%+</strong>
+                    when information is in the middle. With a 100-page document, critical details positioned
+                    mid-document may be missed entirely.
+                </p>
+                <span class="stat red">30%+ accuracy drop in middle positions</span>
+                <br>
+                <a class="source-link" href="https://arxiv.org/abs/2307.03172"
+                    target="_blank">arxiv.org/abs/2307.03172</a>
+                <span class="source-tag">Liu et al., Stanford 2023/TACL 2024</span>
+                <br>
+                <a class="source-link" href="https://cs.stanford.edu/~nfliu/papers/lost-in-the-middle.arxiv2023.pdf"
+                    target="_blank">cs.stanford.edu &mdash; Full PDF</a>
+                <span class="source-tag">Stanford CS</span>
+            </div>
+
+            <div class="finding">
+                <h4>RAG is more consistent and avoids "lost in the middle"</h4>
+                <p>RAG performance remains almost constant as haystack size varies from 2K to 2M tokens, while
+                    long-context models show sharp accuracy drops with increasing context. RAG achieves an
+                    <strong>82.58% win-rate</strong> over raw LLMs by mitigating the lost-in-the-middle effect.
+                </p>
+                <span class="stat green">RAG: 82.58% win-rate vs raw LLMs</span>
+                <span class="stat green">RAG: consistent across context sizes</span>
+                <br>
+                <a class="source-link"
+                    href="https://www.legionintel.com/blog/rag-systems-vs-lcw-performance-and-cost-trade-offs"
+                    target="_blank">legionintel.com &mdash; RAG vs LCW performance and cost trade-offs</a>
+                <span class="source-tag">Legion Intel</span>
+            </div>
+
+            <div class="finding">
+                <h4>Performance degrades past model-specific thresholds</h4>
+                <p>The Databricks benchmark found that most models degrade after a certain context size:
+                    <strong>Llama-3.1-405b</strong> degrades after 32K tokens, <strong>GPT-4-0125-preview</strong> after
+                    64K tokens. A 100-page document may push many models past their effective threshold.
+                </p>
+                <span class="stat red">Llama-3.1-405b: degrades &gt;32K</span>
+                <span class="stat red">GPT-4: degrades &gt;64K</span>
+                <br>
+                <a class="source-link" href="https://www.databricks.com/blog/long-context-rag-performance-llms"
+                    target="_blank">databricks.com/blog/long-context-rag-performance-llms</a>
+                <span class="source-tag">Databricks 2024</span>
+                <br>
+                <a class="source-link" href="https://arxiv.org/html/2411.03538v1"
+                    target="_blank">arxiv.org/html/2411.03538v1</a>
+                <span class="source-tag">Leng et al., 2024</span>
+            </div>
+
+            <div class="finding">
+                <h4>"Summary of a Haystack" &mdash; both approaches still struggle</h4>
+                <p>This EMNLP 2024 benchmark found that even with oracle retrieval, systems lag estimated human
+                    performance (56%) by 10+ points. Without retrieval, long-context LLMs like GPT-4o and Claude 3 Opus
+                    score <strong>below 20%</strong> on complex summarization-with-citation tasks.</p>
+                <span class="stat red">LC without retrieval: &lt;20% on SummHay</span>
+                <br>
+                <a class="source-link" href="https://arxiv.org/abs/2407.01370"
+                    target="_blank">arxiv.org/abs/2407.01370</a>
+                <span class="source-tag">SummHay, EMNLP 2024</span>
+            </div>
+
+            <div class="finding">
+                <h4>Multi-instruction prompts compound error risk</h4>
+                <p>Scenario A asks the model to do multiple things in a single call. Research shows accuracy
+                    degrades with prompt complexity&mdash;each additional instruction increases the chance the model
+                    drops or conflates tasks. Scenario B's single-instruction-per-call approach isolates each task,
+                    reducing compounding errors.</p>
+                <a class="source-link" href="https://blog.dailydoseofds.com/p/will-long-context-llms-make-rag-obsolete"
+                    target="_blank">blog.dailydoseofds.com &mdash; Will Long-Context LLMs Make RAG Obsolete?</a>
+                <span class="source-tag">Daily Dose of DS</span>
+            </div>
+        </section>
+
+        <!-- ===== HYBRID / DECISION FRAMEWORK ===== -->
+        <section>
+            <h2 class="hybrid">Hybrid Approaches &amp; Decision Framework</h2>
+
+            <div class="callout hybrid">
+                <strong>The emerging consensus:</strong> "Naive RAG is dead. Sophisticated RAG is thriving. The correct
+                answer is to evaluate the requirements, understand the tradeoffs, and choose the simplest solution that
+                meets the constraints." A hybrid approach that routes between RAG and LC is often optimal.
+            </div>
+
+            <div class="finding">
+                <h4>LaRA Benchmark (ICML 2025) &mdash; No silver bullet</h4>
+                <p>LaRA tested 2,326 cases across four QA tasks and three long-context types on 11 LLMs. The optimal
+                    choice between RAG and LC depends on a <strong>complex interplay of model capabilities, context
+                        length, task type, and retrieval characteristics</strong>. Neither approach dominates across all
+                    scenarios.</p>
+                <a class="source-link" href="https://arxiv.org/abs/2502.09977"
+                    target="_blank">arxiv.org/abs/2502.09977</a>
+                <span class="source-tag">LaRA, ICML 2025</span>
+                <br>
+                <a class="source-link" href="https://openreview.net/forum?id=CLF25dahgA" target="_blank">openreview.net
+                    &mdash; LaRA</a>
+                <span class="source-tag">OpenReview</span>
+                <br>
+                <a class="source-link" href="https://github.com/Alibaba-NLP/LaRA"
+                    target="_blank">github.com/Alibaba-NLP/LaRA</a>
+                <span class="source-tag">Code &amp; Data</span>
+            </div>
+
+            <div class="finding">
+                <h4>For this specific scenario: RAG likely wins overall</h4>
+                <p>For a 100-page document with 6 distinct tasks, the RAG approach (Scenario B) is likely better
+                    because: (1) each task gets focused context, avoiding lost-in-the-middle issues; (2) 6 parallel
+                    calls are much faster; (3) cost is 5&ndash;10&times; lower; (4) single-instruction prompts produce
+                    more reliable outputs. Long-context wins only if tasks require <em>cross-document reasoning</em>
+                    across the entire 100 pages simultaneously.</p>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th>Dimension</th>
+                        <th>Scenario A (Long Context)</th>
+                        <th>Scenario B (RAG &times; 6)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Input tokens</strong></td>
+                        <td class="tag-lc">~50&ndash;130K</td>
+                        <td class="tag-rag">~12K total (6 &times; ~2K)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Approx. cost per run</strong></td>
+                        <td class="tag-lc">$0.50&ndash;$2.00+</td>
+                        <td class="tag-rag">$0.05&ndash;$0.20</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Latency</strong></td>
+                        <td class="tag-lc">30&ndash;60s</td>
+                        <td class="tag-rag">1&ndash;2s (parallel)</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Accuracy (avg)</strong></td>
+                        <td class="tag-lc">Higher on avg (+4&ndash;13%)</td>
+                        <td class="tag-rag">More consistent; avoids middle-loss</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Failure mode</strong></td>
+                        <td class="tag-lc">Misses mid-document info; conflates multi-instructions</td>
+                        <td class="tag-rag">Retrieval miss = wrong context entirely</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Best for</strong></td>
+                        <td class="tag-lc">Cross-document reasoning, holistic analysis</td>
+                        <td class="tag-rag">Targeted extraction, multiple specific questions</td>
+                    </tr>
+                </tbody>
+            </table>
+        </section>
+
+        <!-- ===== FULL SOURCE INDEX ===== -->
+        <section>
+            <h2 class="papers">Complete Source Index</h2>
+            <p style="color: var(--text-muted); margin-bottom: 20px;">All sources cited above, organized by category.
+                Click any link to read the original.</p>
+
+            <h3 style="margin: 24px 0 12px; color: var(--accent);">Academic Papers</h3>
+            <ol class="ref-list">
+                <li>
+                    <strong>Retrieval Augmented Generation or Long-Context LLMs? A Comprehensive Study and Hybrid
+                        Approach</strong>
+                    <a href="https://arxiv.org/abs/2407.16833" target="_blank">https://arxiv.org/abs/2407.16833</a>
+                    <br><a href="https://aclanthology.org/2024.emnlp-industry.66/"
+                        target="_blank">https://aclanthology.org/2024.emnlp-industry.66/</a>
+                    <div class="desc">Li et al., EMNLP 2024. The definitive head-to-head comparison. LC outperforms RAG
+                        by 4&ndash;13% on average but at 2&ndash;3&times; the cost. Proposes Self-Route hybrid that cuts
+                        cost 39&ndash;65% with &lt;2% accuracy loss.</div>
+                </li>
+                <li>
+                    <strong>Lost in the Middle: How Language Models Use Long Contexts</strong>
+                    <a href="https://arxiv.org/abs/2307.03172" target="_blank">https://arxiv.org/abs/2307.03172</a>
+                    <br><a href="https://cs.stanford.edu/~nfliu/papers/lost-in-the-middle.arxiv2023.pdf"
+                        target="_blank">https://cs.stanford.edu/~nfliu/papers/lost-in-the-middle.arxiv2023.pdf</a>
+                    <div class="desc">Liu et al., Stanford / TACL 2024. Landmark study showing 30%+ accuracy degradation
+                        when relevant info is in the middle of long contexts. Foundational motivation for RAG.</div>
+                </li>
+                <li>
+                    <strong>LaRA: Benchmarking RAG and Long-Context LLMs &mdash; No Silver Bullet</strong>
+                    <a href="https://arxiv.org/abs/2502.09977" target="_blank">https://arxiv.org/abs/2502.09977</a>
+                    <br><a href="https://openreview.net/forum?id=CLF25dahgA"
+                        target="_blank">https://openreview.net/forum?id=CLF25dahgA</a>
+                    <br><a href="https://github.com/Alibaba-NLP/LaRA"
+                        target="_blank">https://github.com/Alibaba-NLP/LaRA</a>
+                    <div class="desc">ICML 2025. 2,326 test cases across 11 LLMs. Concludes that optimal choice depends
+                        on model, context length, task type, and retrieval quality. Neither approach dominates.</div>
+                </li>
+                <li>
+                    <strong>Summary of a Haystack: A Challenge to Long-Context LLMs and RAG Systems</strong>
+                    <a href="https://arxiv.org/abs/2407.01370" target="_blank">https://arxiv.org/abs/2407.01370</a>
+                    <div class="desc">EMNLP 2024. Complex summarization benchmark where long-context LLMs score below
+                        20% without retrieval. Even oracle-retrieval RAG lags human performance by 10+ points.</div>
+                </li>
+                <li>
+                    <strong>Long Context RAG Performance of Large Language Models</strong>
+                    <a href="https://arxiv.org/html/2411.03538v1"
+                        target="_blank">https://arxiv.org/html/2411.03538v1</a>
+                    <div class="desc">Leng (Databricks), 2024. Benchmarks 20 LLMs showing performance degrades past
+                        model-specific context thresholds (32K for Llama-3.1-405b, 64K for GPT-4).</div>
+                </li>
+                <li>
+                    <strong>Evaluating RAG vs. Long-Context Input for Clinical Reasoning over EHRs</strong>
+                    <a href="https://arxiv.org/abs/2508.14817" target="_blank">https://arxiv.org/abs/2508.14817</a>
+                    <div class="desc">Aug 2025. Domain-specific comparison in healthcare, where clinical notes often
+                        exceed even extended context windows. Shows RAG is practical when documents exceed model limits.
+                    </div>
+                </li>
+                <li>
+                    <strong>Stronger Baselines for RAG with Long-Context Language Models</strong>
+                    <a href="https://arxiv.org/html/2506.03989v1"
+                        target="_blank">https://arxiv.org/html/2506.03989v1</a>
+                    <div class="desc">June 2025. Systematically increases token budgets to analyze how RAG and LC
+                        leverage extended contexts. Suggests simpler retrieve-then-read may suffice for long-context
+                        models.</div>
+                </li>
+                <li>
+                    <strong>U-NIAH: Unified RAG and LLM Evaluation for Long Context Needle-In-A-Haystack</strong>
+                    <a href="https://arxiv.org/html/2503.00353v1"
+                        target="_blank">https://arxiv.org/html/2503.00353v1</a>
+                    <div class="desc">March 2025. Unified evaluation framework for both RAG and long-context approaches
+                        on needle-in-a-haystack tasks.</div>
+                </li>
+            </ol>
+
+            <h3 style="margin: 24px 0 12px; color: var(--accent2);">Industry Benchmarks &amp; Technical Blogs</h3>
+            <ol class="ref-list">
+                <li>
+                    <strong>Databricks: Long Context RAG Performance of LLMs</strong>
+                    <a href="https://www.databricks.com/blog/long-context-rag-performance-llms"
+                        target="_blank">https://www.databricks.com/blog/long-context-rag-performance-llms</a>
+                    <div class="desc">Benchmark of 20 LLMs on RAG tasks from 2K to 128K+ tokens. Shows model-specific
+                        degradation thresholds and failure patterns.</div>
+                </li>
+                <li>
+                    <strong>Databricks: Long Context RAG Capabilities of OpenAI o1 and Google Gemini</strong>
+                    <a href="https://www.databricks.com/blog/long-context-rag-capabilities-openai-o1-and-google-gemini"
+                        target="_blank">https://www.databricks.com/blog/long-context-rag-capabilities-openai-o1-and-google-gemini</a>
+                    <div class="desc">Follow-up benchmark comparing o1 and Gemini models. OpenAI o1 shows consistent
+                        improvement over Google models up to 128K tokens.</div>
+                </li>
+                <li>
+                    <strong>Meilisearch: RAG vs. Long-Context LLMs &mdash; A Side-by-Side Comparison</strong>
+                    <a href="https://www.meilisearch.com/blog/rag-vs-long-context-llms"
+                        target="_blank">https://www.meilisearch.com/blog/rag-vs-long-context-llms</a>
+                    <div class="desc">Practical comparison with specific latency numbers (1s RAG vs 45s LC), cost
+                        analysis, and use-case recommendations.</div>
+                </li>
+                <li>
+                    <strong>Elasticsearch Labs: RAG vs Long Context Model LLM</strong>
+                    <a href="https://www.elastic.co/search-labs/blog/rag-vs-long-context-model-llm"
+                        target="_blank">https://www.elastic.co/search-labs/blog/rag-vs-long-context-model-llm</a>
+                    <div class="desc">Analysis of infrastructure costs, token economics, and when each approach is
+                        appropriate from a search-infrastructure perspective.</div>
+                </li>
+                <li>
+                    <strong>LlamaIndex: Towards Long Context RAG</strong>
+                    <a href="https://www.llamaindex.ai/blog/towards-long-context-rag"
+                        target="_blank">https://www.llamaindex.ai/blog/towards-long-context-rag</a>
+                    <div class="desc">Framework perspective on combining RAG with long-context models for
+                        best-of-both-worlds architectures.</div>
+                </li>
+                <li>
+                    <strong>Snorkel AI: Long Context Models in the Enterprise</strong>
+                    <a href="https://snorkel.ai/blog/long-context-models-in-the-enterprise-benchmarks-and-beyond/"
+                        target="_blank">https://snorkel.ai/blog/long-context-models-in-the-enterprise-benchmarks-and-beyond/</a>
+                    <div class="desc">Enterprise-focused analysis of long-context model limitations beyond synthetic
+                        benchmarks. Discusses real-world deployment considerations.</div>
+                </li>
+                <li>
+                    <strong>Legion Intel: RAG Systems vs LCW &mdash; Performance and Cost Trade-offs</strong>
+                    <a href="https://www.legionintel.com/blog/rag-systems-vs-lcw-performance-and-cost-trade-offs"
+                        target="_blank">https://www.legionintel.com/blog/rag-systems-vs-lcw-performance-and-cost-trade-offs</a>
+                    <div class="desc">Shows RAG performance remains constant from 2K to 2M tokens while LCW models show
+                        sharp accuracy drops. RAG achieves 82.58% win-rate over raw LLMs.</div>
+                </li>
+                <li>
+                    <strong>Stack Overflow: Are Long Context Windows the End of RAG?</strong>
+                    <a href="https://stackoverflow.blog/2024/04/02/are-long-context-windows-the-end-of-rag/"
+                        target="_blank">https://stackoverflow.blog/2024/04/02/are-long-context-windows-the-end-of-rag/</a>
+                    <div class="desc">Developer-community perspective on the debate. Concludes RAG remains necessary for
+                        dynamic knowledge, cost control, and citation.</div>
+                </li>
+                <li>
+                    <strong>Zilliz: Will RAG Be Killed by Long-Context LLMs?</strong>
+                    <a href="https://zilliz.com/blog/will-retrieval-augmented-generation-RAG-be-killed-by-long-context-LLMs"
+                        target="_blank">https://zilliz.com/blog/will-retrieval-augmented-generation-RAG-be-killed-by-long-context-LLMs</a>
+                    <div class="desc">Vector DB vendor perspective (Milvus). Argues RAG evolves rather than dies, with
+                        long context enabling better retrieval strategies.</div>
+                </li>
+                <li>
+                    <strong>ByteIota: RAG vs Long Context 2026 &mdash; Is Retrieval Really Dead?</strong>
+                    <a href="https://byteiota.com/rag-vs-long-context-2026-retrieval-debate/"
+                        target="_blank">https://byteiota.com/rag-vs-long-context-2026-retrieval-debate/</a>
+                    <div class="desc">2026 analysis addressing the "RAG is dead" claim. Covers speed (1s vs 45s), cost,
+                        and accuracy with current-generation models.</div>
+                </li>
+            </ol>
+
+            <h3 style="margin: 24px 0 12px; color: var(--cost);">Cost &amp; Infrastructure</h3>
+            <ol class="ref-list">
+                <li>
+                    <strong>Anthropic: Prompt Caching</strong>
+                    <a href="https://www.anthropic.com/news/prompt-caching"
+                        target="_blank">https://www.anthropic.com/news/prompt-caching</a>
+                    <div class="desc">Official Anthropic docs. 90% cost reduction and 85% latency reduction for cached
+                        long-context prompts.</div>
+                </li>
+                <li>
+                    <strong>ngrok: Prompt Caching &mdash; 10x Cheaper LLM Tokens</strong>
+                    <a href="https://ngrok.com/blog/prompt-caching/"
+                        target="_blank">https://ngrok.com/blog/prompt-caching/</a>
+                    <div class="desc">Deep technical explanation of how prompt caching works (KV-cache reuse) and
+                        comparison of provider implementations.</div>
+                </li>
+                <li>
+                    <strong>McGinnis: LLM Prompt Caching Comparison (Anthropic vs OpenAI)</strong>
+                    <a href="https://mcginniscommawill.com/posts/2025-11-17-llm-prompt-caching-comparison/"
+                        target="_blank">https://mcginniscommawill.com/posts/2025-11-17-llm-prompt-caching-comparison/</a>
+                    <div class="desc">Hands-on testing of prompt caching across providers with real cost and latency
+                        measurements.</div>
+                </li>
+                <li>
+                    <strong>Tribe AI: Reducing Latency and Cost at Scale</strong>
+                    <a href="https://www.tribe.ai/applied-ai/reducing-latency-and-cost-at-scale-llm-performance"
+                        target="_blank">https://www.tribe.ai/applied-ai/reducing-latency-and-cost-at-scale-llm-performance</a>
+                    <div class="desc">Enterprise strategies for optimizing LLM cost and latency, including
+                        parallelization and context management.</div>
+                </li>
+                <li>
+                    <strong>Google AI: Long Context Documentation</strong>
+                    <a href="https://ai.google.dev/gemini-api/docs/long-context"
+                        target="_blank">https://ai.google.dev/gemini-api/docs/long-context</a>
+                    <div class="desc">Google's official guidance on using Gemini's 1M+ token context window, including
+                        when they recommend long context vs. RAG.</div>
+                </li>
+            </ol>
+
+            <h3 style="margin: 24px 0 12px; color: var(--speed);">Needle-in-a-Haystack &amp; Evaluation</h3>
+            <ol class="ref-list">
+                <li>
+                    <strong>Greg Kamradt: Needle in a Haystack Test</strong>
+                    <a href="https://github.com/gkamradt/LLMTest_NeedleInAHaystack"
+                        target="_blank">https://github.com/gkamradt/LLMTest_NeedleInAHaystack</a>
+                    <div class="desc">The original NIAH test implementation. Measures retrieval accuracy at various
+                        context lengths and needle positions. The source of the famous heatmap visualizations.</div>
+                </li>
+                <li>
+                    <strong>Arize AI: The Needle in a Haystack Test</strong>
+                    <a href="https://arize.com/blog-course/the-needle-in-a-haystack-test-evaluating-the-performance-of-llm-rag-systems/"
+                        target="_blank">https://arize.com/blog-course/the-needle-in-a-haystack-test-evaluating-the-performance-of-llm-rag-systems/</a>
+                    <div class="desc">Detailed walkthrough of NIAH methodology and its implications for RAG system
+                        design.</div>
+                </li>
+                <li>
+                    <strong>LangChain: Multi Needle in a Haystack</strong>
+                    <a href="https://blog.langchain.com/multi-needle-in-a-haystack/"
+                        target="_blank">https://blog.langchain.com/multi-needle-in-a-haystack/</a>
+                    <div class="desc">Extension of NIAH to multiple retrieval targets, more closely matching real-world
+                        multi-question scenarios like Scenario A.</div>
+                </li>
+            </ol>
+
+            <h3 style="margin: 24px 0 12px; color: #a78bfa;">Multi-Instruction Degradation &amp; Pipeline Research</h3>
+            <ol class="ref-list">
+                <li>
+                    <strong>Curse of Instructions: Large Language Models Cannot Follow Multiple Instructions at
+                        Once</strong>
+                    <a href="https://openreview.net/forum?id=R6q67CDBCH"
+                        target="_blank">https://openreview.net/forum?id=R6q67CDBCH</a>
+                    <div class="desc">Shows that LLM success rate decays exponentially with instruction count: P(all) =
+                        P(single)^n. Fundamental result explaining why multi-task single-call approaches fail.</div>
+                </li>
+                <li>
+                    <strong>How Many Instructions Can LLMs Follow at Once?</strong>
+                    <a href="https://arxiv.org/html/2507.11538v1"
+                        target="_blank">https://arxiv.org/html/2507.11538v1</a>
+                    <div class="desc">Jaroslawicz et al. IFScale benchmark of 500 keyword-inclusion instructions. Three
+                        degradation patterns: threshold decay (reasoning models), linear decay (GPT-4.1, Claude Sonnet
+                        4), exponential decay (GPT-4o).</div>
+                </li>
+                <li>
+                    <strong>Degradation of Multi-Task Prompting Across Six NLP Tasks and LLM Families</strong>
+                    <a href="https://www.mdpi.com/2079-9292/14/21/4349"
+                        target="_blank">https://www.mdpi.com/2079-9292/14/21/4349</a>
+                    <div class="desc">Systematic study showing GPT-4o achieves only 15% all-instructions-followed rate
+                        at 10 instructions. Architecture-dependent: some models collapse entirely on fine-grained tasks.
+                    </div>
+                </li>
+                <li>
+                    <strong>Single-Task vs. Multitask Prompts: Comparative Analysis</strong>
+                    <a href="https://www.mdpi.com/2079-9292/13/23/4712"
+                        target="_blank">https://www.mdpi.com/2079-9292/13/23/4712</a>
+                    <div class="desc">No universal rule favoring single-task prompts, but performance is highly
+                        model-dependent. Multi-task prompts cause severe collapse in some architectures on fine-grained
+                        semantic tasks.</div>
+                </li>
+                <li>
+                    <strong>Prompt Chaining for AI Engineers: Improving LLM Output Quality</strong>
+                    <a href="https://www.getmaxim.ai/articles/prompt-chaining-for-ai-engineers-a-practical-guide-to-improving-llm-output-quality/"
+                        target="_blank">https://www.getmaxim.ai/articles/prompt-chaining-for-ai-engineers-a-practical-guide-to-improving-llm-output-quality/</a>
+                    <div class="desc">ACL 2024 research showing chained refinement outperforms monolithic stepwise
+                        prompts. Chaining reduces hallucination and simplifies fault isolation.</div>
+                </li>
+                <li>
+                    <strong>AI Agents in Clinical Medicine: A Systematic Review (PMC/NIH)</strong>
+                    <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC12407621/"
+                        target="_blank">https://pmc.ncbi.nlm.nih.gov/articles/PMC12407621/</a>
+                    <div class="desc">2024-2025 systematic review of multi-agent LLM systems in healthcare. Specialized
+                        agents outperform monolithic approaches for clinical reasoning and compliance tasks.</div>
+                </li>
+                <li>
+                    <strong>Multi-Agent System for Medical Necessity Justification (BioNLP 2024)</strong>
+                    <a href="https://aclanthology.org/2024.bionlp-1.4.pdf"
+                        target="_blank">https://aclanthology.org/2024.bionlp-1.4.pdf</a>
+                    <div class="desc">Pipeline of specialized LLM agents for healthcare regulatory justification.
+                        Demonstrates auditability and accuracy benefits of multi-agent architecture over single-call
+                        approaches.</div>
+                </li>
+            </ol>
+
+            <h3 style="margin: 24px 0 12px; color: var(--text-muted);">Additional Analysis &amp; Perspectives</h3>
+            <ol class="ref-list">
+                <li>
+                    <strong>Daily Dose of DS: Will Long-Context LLMs Make RAG Obsolete?</strong>
+                    <a href="https://blog.dailydoseofds.com/p/will-long-context-llms-make-rag-obsolete"
+                        target="_blank">https://blog.dailydoseofds.com/p/will-long-context-llms-make-rag-obsolete</a>
+                    <div class="desc">Accessible overview of the tradeoffs with visual explanations. Discusses when RAG
+                        still wins.</div>
+                </li>
+                <li>
+                    <strong>Kanerika: RAG vs LLM 2026 Comparison Guide</strong>
+                    <a href="https://kanerika.com/blogs/rag-vs-llm/"
+                        target="_blank">https://kanerika.com/blogs/rag-vs-llm/</a>
+                    <div class="desc">Enterprise decision guide for AI architects choosing between RAG and long-context
+                        approaches in 2026.</div>
+                </li>
+                <li>
+                    <strong>DEV Community: Understanding RAG and Long-Context LLMs (Self-Route Insights)</strong>
+                    <a href="https://dev.to/m_sea_bass/understanding-rag-and-long-context-llms-insights-from-the-self-route-hybrid-approach-2mfa"
+                        target="_blank">https://dev.to/m_sea_bass/understanding-rag-and-long-context-llms-insights-from-the-self-route-hybrid-approach-2mfa</a>
+                    <div class="desc">Developer-friendly walkthrough of the Self-Route paper with implementation
+                        insights.</div>
+                </li>
+                <li>
+                    <strong>GetMaxim: Exploring LLM Approaches &mdash; Long-Context vs. RAG</strong>
+                    <a href="https://www.getmaxim.ai/blog/llm-rag-compare/"
+                        target="_blank">https://www.getmaxim.ai/blog/llm-rag-compare/</a>
+                    <div class="desc">Practical comparison with decision matrix for choosing between approaches based on
+                        use-case characteristics.</div>
+                </li>
+                <li>
+                    <strong>Analytics Vidhya: Evolution of RAG to Agentic RAG</strong>
+                    <a href="https://www.analyticsvidhya.com/blog/2024/10/evolution-of-agentic-rag/"
+                        target="_blank">https://www.analyticsvidhya.com/blog/2024/10/evolution-of-agentic-rag/</a>
+                    <div class="desc">Traces the evolution from naive RAG through advanced RAG to agentic RAG, showing
+                        how the field is moving beyond simple retrieval.</div>
+                </li>
+            </ol>
+        </section>
+
+        <footer>
+            <p>Research compiled February 2026. Sources should be independently verified&mdash;URLs and findings were
+                current at time of compilation.</p>
+        </footer>
+
+    </div>
+</body>
+
+</html>
